@@ -11,7 +11,7 @@ load_dotenv()
 # Configure Google Generative AI
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Initial prompt for creating SQL query
+# Initial prompt for creating SQL query with memory instructions
 sql_prompt = [
     """
     You are an expert in converting English questions into SQL queries.
@@ -23,14 +23,19 @@ sql_prompt = [
     or if the question is "Tell me all the students in the math section", 
     the SQL should be: SELECT * FROM STUDENT WHERE SECTION="math";
     Provide the SQL code directly, with no additional quotes or symbols.
+
+    If there is recent message history, use it only if relevant to the current question; otherwise, focus on the new question.
     """
 ]
 
-# Function to generate SQL query using Gemini with chat history context
-def generate_sql_query(history, question):
-    # Combine chat history with the current question for contextual understanding
+# Function to generate SQL query with memory
+def generate_sql_query(history, question, max_history=5):
+    # Use the most recent `max_history` messages for context
+    recent_history = history[-max_history:]
     full_prompt = sql_prompt[0] + "\n\nConversation history:\n"
-    for entry in history:
+    
+    # Construct the prompt with recent conversation history
+    for entry in recent_history:
         full_prompt += f"{entry['sender']}: {entry['message']}\n"
     full_prompt += f"User: {question}\nBot:"
 
@@ -77,7 +82,7 @@ def generate_human_response(question, data):
 st.set_page_config(page_title="SQL to Natural Language")
 st.title("SQL Query Chatbot")
 
-# Initialize session state for chat history
+# Initialize session state for chat history with memory support
 if "chat_history" not in st.session_state:
     st.session_state["chat_history"] = []
 
@@ -89,7 +94,7 @@ if submit and user_question:
     # Display the user's question in the chat history
     st.session_state["chat_history"].append({"sender": "User", "message": user_question})
     
-    # Generate SQL query
+    # Generate SQL query with memory
     try:
         sql_query = generate_sql_query(st.session_state["chat_history"], user_question)
         st.session_state["chat_history"].append({"sender": "Bot", "message": f"Generated SQL Query: `{sql_query}`"})
